@@ -1,0 +1,18 @@
+# Midad | مِداد — robots.txt
+# https://midadd.web.app
+
+User-agent: *
+Allow: /
+Disallow: /?page=verify
+Disallow: /?payment=cancel
+Disallow: /*?*action=
+
+# Sitemap
+Sitemap: https://midadd.web.app/sitemap.xml
+
+# Crawl-delay for aggressive bots
+User-agent: AhrefsBot
+Crawl-delay: 10
+
+User-agent: SemrushBot
+Crawl-delay: 10

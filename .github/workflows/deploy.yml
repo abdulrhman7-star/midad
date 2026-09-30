@@ -1,0 +1,103 @@
+name: 🚀 Deploy Midad to Firebase
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
+jobs:
+  # ============================================================
+  #  JOB 1 — Validate & Deploy
+  # ============================================================
+  build-and-deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v5
+
+      # ============ التحقق من الملفات الأساسية ============
+      - name: 🔍 Validate project structure
+        run: |
+          echo "📂 Checking required files..."
+          MISSING=0
+          
+          for file in "public/index.html" "firebase.json" ".firebaserc"; do
+            if [ ! -f "$file" ]; then
+              echo "❌ Missing: $file"
+              MISSING=1
+            else
+              echo "✅ Found: $file ($(wc -c < "$file") bytes)"
+            fi
+          done
+          
+          if [ $MISSING -eq 1 ]; then
+            echo "❌ Required files are missing!"
+            exit 1
+          fi
+          
+          echo ""
+          echo "📦 Project structure:"
+          ls -la public/
+
+      - name: 🔍 Validate firebase.json is valid JSON
+        run: |
+          if ! node -e "JSON.parse(require('fs').readFileSync('firebase.json', 'utf8'))"; then
+            echo "❌ firebase.json is not valid JSON!"
+            exit 1
+          fi
+          echo "✅ firebase.json is valid JSON"
+
+      - name: 🔍 Validate HTML has no obvious syntax errors
+        run: |
+          SIZE=$(wc -c < public/index.html)
+          if [ "$SIZE" -lt 1000 ]; then
+            echo "⚠️  Warning: index.html is very small ($SIZE bytes)"
+          fi
+          echo "✅ HTML validation passed"
+
+      # ============ النشر على Production ============
+      - name: 🚀 Deploy to Production
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          channelId: live
+          projectId: midadd
+
+      # ============ Preview للـ PRs ============
+      - name: 🧪 Deploy Preview Channel
+        if: github.event_name == 'pull_request'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          projectId: midadd
+          expires: 7d
+
+      # ============ الملخص النهائي ============
+      - name: ✅ Deployment summary
+        if: github.event_name == 'push'
+        run: |
+          echo "## 🎉 Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Element | Value |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| 🌐 **URL** | https://midadd.web.app |" >> $GITHUB_STEP_SUMMARY
+          echo "| 📝 **Commit** | \`${{ github.sha }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| 👤 **Author** | @${{ github.actor }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| 🕐 **Time** | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### 🔗 Quick Links" >> $GITHUB_STEP_SUMMARY
+          echo "- [Live Site](https://midadd.web.app)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Firebase Console](https://console.firebase.google.com/project/midadd/hosting)" >> $GITHUB_STEP_SUMMARY
